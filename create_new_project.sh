@@ -78,26 +78,80 @@ ValidateCLIIsInstalled "travis"
 PrintGreenLn "All Dependencies Are Satisfied! Let's go!"
 
 
-PrintYellowLn "\n### User Input"
-InputOrDefault () {
-  local __resultvar=$1
-  read -r InputOrDefaultTmpVar
-  if [ -z "$InputOrDefaultTmpVar" ]
-  then 
-    InputOrDefaultTmpVar=$2
-  fi
-  eval $__resultvar="'$InputOrDefaultTmpVar'"
-}
+ProjectName=""
+BaseDir="/Users/gradyward/go/src"
+FirstLambdaName="helloworld"
+FirstLambdaNameUc="HelloWorld"
+ProjectRegion="us-east-2"
 
-PrintPurpleLn "Creating a new project. Please enter a name for the new project (lower case, no special characters or spaces)."
-InputOrDefault ProjectName "defaultproject"
+# Loop through arguments and process them
+for arg in "$@"
+do
+    case $arg in
+        --project=*)
+        ProjectName="${arg#*=}"
+        shift
+        ;;
+        --base_directory=*)
+        BaseDir="${arg#*=}"
+        shift
+        ;;
+        --lambda=*)
+        FirstLambdaNameUc="${arg#*=}"
+        FirstLambdaName="$(echo $FirstLambdaNameUc | tr '[:upper:]' '[:lower:]')"
+        shift
+        ;;
+        *)
+        PrintRedLn "Unrecognized Argument $arg"
+        exit 1
+        shift # Remove generic argument from processing
+        ;;
+    esac
+done
 
-PrintPurple "Excellent. Creating Project "
-PrintGreenLn "$ProjectName"
-BaseDirDefault="/Users/gradyward/go/src"
-PrintPurple "Next, please specify the directory that you want this project to be created in. This should be an absolute path from /. Omit the trailing slash. If not specified, your code will live in "
-PrintBlueLn "$BaseDirDefault"
-InputOrDefault BaseDir "$BaseDirDefault"
+if [ -z $ProjectName ]
+then
+  PrintYellowLn "\n### User Input (see README.md to see command line input options)"
+  InputOrDefault () {
+    local __resultvar=$1
+    read -r InputOrDefaultTmpVar
+    if [ -z "$InputOrDefaultTmpVar" ]
+    then 
+      InputOrDefaultTmpVar=$2
+    fi
+    eval $__resultvar="'$InputOrDefaultTmpVar'"
+  }
+
+  PrintPurpleLn "Creating a new project. Please enter a name for the new project (lower case, no special characters or spaces)."
+  InputOrDefault ProjectName "defaultproject"
+
+  PrintPurple "Excellent. Creating Project "
+  PrintGreenLn "$ProjectName"
+  BaseDirDefault="/Users/gradyward/go/src"
+  PrintPurple "Next, please specify the directory that you want this project to be created in. This should be an absolute path from /. Omit the trailing slash. If not specified, your code will live in "
+  PrintBlueLn "$BaseDirDefault"
+  InputOrDefault BaseDir "$BaseDirDefault"
+
+  PrintPurple "Great! Next, please give us the name of the first lambda you want to write in this project. The name you enter here will be prefixed by the project name in most contexts, so give a project-specific name. This should not include spaces or other special characters and should be lowercase. If not specified, your first lambda will be called "
+  PrintBlueLn "helloworld"
+  InputOrDefault FirstLambdaName "helloworld"
+
+  FirstLambdaNameUcDefault="$(tr '[:lower:]' '[:upper:]' <<< ${FirstLambdaName:0:1})${FirstLambdaName:1}"
+  PrintPurple "Next, give us the UpperCasing of the lambda name. For example, if your lambda is helloworld, you might want it to appear as HelloWorld in capitalization sensitive domains. If nothing is specified, we will use "
+  PrintBlueLn "$FirstLambdaNameUcDefault" 
+  InputOrDefault FirstLambdaNameUc "$FirstLambdaNameUcDefault"
+
+  PrintPurple "Finally, what region would you like this lambda to run in? If not specified, they will run in "
+  PrintBlueLn "us-east-2"
+  InputOrDefault ProjectRegion "us-east-2"
+else 
+  PrintBlueLn "Found all arguments required for processing: "
+  PrintBlueLn "  ProjectName: $ProjectName"
+  PrintBlueLn "  BaseDir: $BaseDir"
+  PrintBlueLn "  FirstLambdaName: $FirstLambdaName"
+  PrintBlueLn "  FirstLambdaNameUc: $FirstLambdaNameUc"
+  PrintBlueLn "  ProjectRegion: $ProjectRegion"
+fi;
 
 NewProjectFolder="$BaseDir/$ProjectName"
 OriginalPWD="$PWD"
@@ -107,18 +161,6 @@ PrintBlue "Creating Folder $NewProjectFolder... "
 mkdir -p "$NewProjectFolder"
 PrintGreenLn "Done."
 
-PrintPurple "Great! Next, please give us the name of the first lambda you want to write in this project. The name you enter here will be prefixed by the project name in most contexts, so give a project-specific name. This should not include spaces or other special characters and should be lowercase. If not specified, your first lambda will be called "
-PrintBlueLn "helloworld"
-InputOrDefault FirstLambdaName "helloworld"
-
-FirstLambdaNameUcDefault="$(tr '[:lower:]' '[:upper:]' <<< ${FirstLambdaName:0:1})${FirstLambdaName:1}"
-PrintPurple "Next, give us the UpperCasing of the lambda name. For example, if your lambda is helloworld, you might want it to appear as HelloWorld in capitalization sensitive domains. If nothing is specified, we will use "
-PrintBlueLn "$FirstLambdaNameUcDefault" 
-InputOrDefault FirstLambdaNameUc "$FirstLambdaNameUcDefault"
-
-PrintPurple "Finally, what region would you like this lambda to run in? If not specified, they will run in "
-PrintBlueLn "us-east-2"
-InputOrDefault ProjectRegion "us-east-2"
 
 PrintYellowLn "\n### Creating and Building Project and First Lambda"
 CopyFilesOverWithSubstitution () {
@@ -252,7 +294,6 @@ PrintGreenLn "Done."
 PrintBlue "Validating Pull... "
 git pull -q
 PrintGreenLn "Done."
-
 
 PrintYellowLn "\n### Configuring Travis"
 
