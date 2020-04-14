@@ -24,6 +24,7 @@
             "Effect": "Allow",
             "Action": [
                 "lambda:GetFunction",
+                "lambda:GetFunctionConfiguration",
                 "lambda:UpdateFunctionCode",
                 "lambda:UpdateFunctionConfiguration"
             ],

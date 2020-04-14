@@ -9,19 +9,16 @@ go:
 
 script:
   - go test -v
-  - env GOOS=linux GOARCH=amd64 go build -o bin-FIRST_LAMBDA_NAME FIRST_LAMBDA_NAME.go
-  - zip -j bin-FIRST_LAMBDA_NAME.zip bin-FIRST_LAMBDA_NAME
+  - env GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o index.bin-FIRST_LAMBDA_NAME FIRST_LAMBDA_NAME.go
+  - zip -j index.bin-FIRST_LAMBDA_NAME.zip index.bin-FIRST_LAMBDA_NAME
   # [ADD_NEW_BUILD_HERE]
 
 deploy:
-  - provider: lambda
-    function_name: FIRST_LAMBDA_NAME
-    region: PROJECT_REGION
-    role: FIRST_LAMBDA_EXECUTOR_ROLE_ARN
-    runtime: go1.x
-    handler_name: "bin-FIRST_LAMBDA_NAME"
-    access_key_id: TRAVIS_USER_ACCESS_KEY_ID
-    secret_access_key:
-      secure: 
-        TRAVIS_USER_ENCRYPTED_SECRET_ACCESS_KEY
+  provider: lambda
+  function_name: FIRST_LAMBDA_FULL_NAME
+  region: PROJECT_REGION
+  role: FIRST_LAMBDA_EXECUTOR_ROLE_ARN
+  runtime: go1.x
+  handler_name: "bin-FIRST_LAMBDA_NAME"
+  access_key_id: TRAVIS_USER_ACCESS_KEY_ID
   # [ADD_NEW_LAMBDA_DEPLOYMENT_HERE]

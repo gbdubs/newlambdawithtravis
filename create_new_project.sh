@@ -128,6 +128,7 @@ CopyFilesOverWithSubstitution () {
     -e "s/PROJECT_REGION/$ProjectRegion/g" \
     -e "s/FIRST_LAMBDA_NAME/$FirstLambdaName/g" \
     -e "s/FIRST_LAMBDA_ARN/$FirstLambdaArnRegexSafe/g" \
+    -e "s/FIRST_LAMBDA_FULL_NAME/$FirstLambdaFullName/g" \
     -e "s/LAMBDA_NAME/$FirstLambdaName/g" \
     -e "s/FIRST_LAMBDA_EXECUTOR_ROLE_ARN/$FirstLambdaExecutorRoleArnRegexSafe/g" \
     -e "s/FIRST_LAMBDA_NAME_UC/$FirstLambdaNameUc/g" \
@@ -196,7 +197,7 @@ PrintLBlueLn "  Lambda ARN = $FirstLambdaArn"
 # TODO(grady) make this a function not a repeated oneoff
 FirstLambdaArnRegexSafe=$(echo "$FirstLambdaArn" | sed -e 's/[\/&]/\\&/g')
 
-PrintBlue "Waiting 5s for lambda to be callable... "
+PrintBlue "Waiting 10s for lambda to be callable... "
 sleep 10s
 PrintGreenLn "Done."
 
@@ -242,11 +243,11 @@ git commit -q -m "Initial Commit."
 PrintGreenLn "Done."
 PrintBlue "Creating Gitub Project and adding origin... "
 set +e # TODO(grady) Eval whether this is still needed now that we're not running as sudo.
-RepoCreateCommandResult=$(hub create -p "$ProjectName") # Command returns > 0, but actually works...
+RepoCreateCommandResult=$(hub create "$ProjectName") # Command returns > 0, but actually works...
 set -e
 PrintGreenLn "Done."
 PrintBlue "Pushing... "
-git push -q --set-upstream origin master # TODO(grady) get this to be silent.
+git push -q --set-upstream origin master &> /dev/null
 PrintGreenLn "Done."
 PrintBlue "Validating Pull... "
 git pull -q
@@ -254,6 +255,14 @@ PrintGreenLn "Done."
 
 
 PrintYellowLn "\n### Configuring Travis"
+
+PrintBlue "Waiting 10s for GitHub project to be callable... "
+sleep 10s
+PrintGreenLn "Done."
+PrintBlue "Enabling Travis for Repo... "
+travis sync --org --no-interactive &> /dev/null
+travis enable --org --no-interactive --repo="gbdubs/$ProjectName"  &> /dev/null
+PrintGreenLn "Done."
 
 TravisUser="$ProjectName-travis"
 PrintBlue "Creating User for Travis... "
@@ -273,11 +282,13 @@ TravisUserAccessKeyId=$(ExtractFieldFromJsonResult "AccessKeyId" "$AwsCreateKeyF
 TravisUserSecretAccessKey=$(ExtractFieldFromJsonResult "SecretAccessKey" "$AwsCreateKeyForTravisUserCommandResult")
 PrintLBlueLn "  Travis User Access Id = $TravisUserAccessKeyId"
 PrintLBlueLn "  Travis User Secret Key = $TravisUserSecretAccessKey"
-PrintBlue "Encrypting Travis User's Secret Key... "
-TravisUserEncryptedSecretAccessKey=$(travis encrypt --pro secret_access_key="$TravisUserSecretAccessKey") # TODO(grady) attempt to silence this.
-TravisUserEncryptedSecretAccessKeyRegexSafe=$(echo "$TravisUserEncryptedSecretAccessKey" | sed -e 's/[\/&]/\\&/g') 
-
 CopyFilesOverWithSubstitution ".travis.yml" ".travis.yml"
+PrintBlue "Encrypting Travis User's Secret Key... "
+echo "y" | travis encrypt "$TravisUserSecretAccessKey" --org --override --add &> /dev/null deploy.secret_access_key --repo "gbdubs/$ProjectName" 
+#TravisUserEncryptedSecretAccessKey=$(travis encrypt --org --no-interactive secret_access_key="$TravisUserSecretAccessKey") # TODO(grady) attempt to silence this.
+#TravisUserEncryptedSecretAccessKeyRegexSafe=$(echo "$TravisUserEncryptedSecretAccessKey" | sed -e 's/[\/&]/\\&/g') 
+PrintGreenLn "Done."
+
 TravisInlinePolicy="policies/travis-inline-policy.json"
 CopyFilesOverWithSubstitution "policies/allow-travis-to-update-first-lambda.json" "$TravisInlinePolicy"
 
@@ -288,6 +299,7 @@ PrintGreenLn "Done."
 
 PrintBlue "Pushing Travis Configuration to Github... "
 git add ".travis.yml"
+git add "$TravisInlinePolicy"
 git commit -q -m "Adds Travis Configuration."
 git push -q
 git pull -q
@@ -309,19 +321,19 @@ git push -q
 git pull -q
 PrintGreenLn "Done."
 PrintBlue "Waiting for Travis to see the change. If you'd like to follow along go to "
-TravisUrl="https://travis-ci.com/gbdubs/$ProjectName"
+TravisUrl="https://travis-ci.org/gbdubs/$ProjectName"
 PrintLBlueLn "   $TravisUrl"
 PrintBlue "You've waited (expect 15s): "
 MostRecentStatus=$()
 waiting=0
 # TODO(grady) Fix this up so when the loop is broken it doesn't yell.
-while [ -z $(travis whatsup --pro | grep "$ProjectName " | grep "(errored|passed)") ]
+while [ -z $(travis whatsup --org | grep "$ProjectName " | grep "(errored|passed)" -E) ]
 do
   PrintLBlue "[${waiting}s] "
   sleep 5s
   waiting=$(expr $waiting + 5)
 done
-ValidationStatus=$(travis whatsup --pro | grep "$ProjectName" | head)
+ValidationStatus=$(travis whatsup | grep "$ProjectName" | head)
 if [[ $ValidationStatus == *" passed: "* ]]
 then
   PrintGreenLn "Successful Build."
